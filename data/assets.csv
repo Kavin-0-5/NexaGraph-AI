@@ -1,0 +1,8 @@
+id,name,type,ip,criticality,exposed,compromised
+A01,Internet,External,0.0.0.0,Low,Yes,No
+A02,Web-Server,Server,10.0.0.10,High,Yes,No
+A03,App-Server,Server,10.0.0.20,High,No,No
+A04,Employee-PC,Endpoint,10.0.0.30,Medium,No,No
+A05,Backup-Server,Server,10.0.0.40,High,No,No
+A06,Customer-DB,Database,10.0.0.50,Critical,No,No
+A07,Admin-PC,Endpoint,10.0.0.60,High,No,No
