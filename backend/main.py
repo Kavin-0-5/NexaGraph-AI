@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from neo4j import GraphDatabase
 import os
 from dotenv import load_dotenv
@@ -6,6 +7,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="NexaGraph AI")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USER")
@@ -33,51 +43,35 @@ def health():
 
 @app.get("/graph")
 def get_graph():
-
-    nodes = []
-    edges = []
-
     with driver.session() as session:
 
-        node_result = session.run(
-            """
-            MATCH (n:Asset)
-            RETURN n
-            """
-        )
+        nodes_result = session.run("""
+            MATCH (a:Asset)
+            RETURN collect({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                ip: a.ip,
+                criticality: a.criticality,
+                exposed: a.exposed,
+                compromised: a.compromised
+            }) AS nodes
+        """)
 
-        for record in node_result:
-
-            node = record["n"]
-
-            nodes.append({
-                "id": node["id"],
-                "name": node["name"],
-                "type": node["type"],
-                "ip": node["ip"],
-                "criticality": node["criticality"],
-                "exposed": node["exposed"],
-                "compromised": node["compromised"]
-            })
-
-        edge_result = session.run(
-            """
+        edges_result = session.run("""
             MATCH (a:Asset)-[r]->(b:Asset)
-            RETURN a.id AS source,
-                   b.id AS target,
-                   type(r) AS relationship
-            """
-        )
+            RETURN collect({
+                source: a.id,
+                target: b.id,
+                relationship: type(r),
+                protocol: r.protocol
+            }) AS edges
+        """)
 
-        for record in edge_result:
+        nodes = nodes_result.single()["nodes"]
+        edges = edges_result.single()["edges"]
 
-            edges.append({
-                "source": record["source"],
-                "target": record["target"],
-                "relationship": record["relationship"]
-            })
-
-    return {
-        "nodes": nodes,
-        "edges": edges
-    }
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
