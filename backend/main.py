@@ -362,6 +362,104 @@ SCORING_NOTE = (
 )
 
 
+
+def build_remediation_recommendations(paths, nodes, limit=3):
+    """Rank connections in residual attack paths for security review.
+
+    Recommendations are triage suggestions, not proof of a vulnerability.
+    This function never changes the database.
+    """
+    if not paths:
+        return []
+
+    try:
+        limit = max(0, min(int(limit), 10))
+    except (TypeError, ValueError):
+        limit = 3
+
+    if limit == 0:
+        return []
+
+    node_map = {node["id"]: node for node in nodes if "id" in node}
+    edge_stats = {}
+
+    for path in paths:
+        try:
+            risk = max(0, min(100, int(path.get("risk_score", 0))))
+        except (TypeError, ValueError):
+            risk = 0
+
+        # Count each connection at most once per path.
+        seen_in_path = set()
+
+        for edge in path.get("connections", []):
+            source = edge.get("source")
+            target = edge.get("target")
+            relationship = str(
+                edge.get("relationship") or "CONNECTS"
+            ).upper()
+
+            if source is None or target is None:
+                continue
+
+            key = (source, target, relationship)
+
+            if key in seen_in_path:
+                continue
+            seen_in_path.add(key)
+
+            if key not in edge_stats:
+                edge_stats[key] = {
+                    "path_count": 0,
+                    "weighted_score": 0,
+                    "max_path_risk": 0,
+                }
+
+            stats = edge_stats[key]
+            stats["path_count"] += 1
+            stats["weighted_score"] += risk
+            stats["max_path_risk"] = max(
+                stats["max_path_risk"], risk
+            )
+
+    ranked = sorted(
+        edge_stats.items(),
+        key=lambda item: (
+            item[1]["max_path_risk"],
+            item[1]["path_count"],
+            item[1]["weighted_score"],
+        ),
+        reverse=True,
+    )
+
+    recommendations = []
+
+    for (source, target, relationship), stats in ranked[:limit]:
+        source_node = node_map.get(source, {})
+        target_node = node_map.get(target, {})
+
+        recommendations.append({
+            "action_type": "review-connection",
+            "source_id": source,
+            "source_name": source_node.get("name", str(source)),
+            "destination_id": target,
+            "destination_name": target_node.get("name", str(target)),
+            "relationship": relationship,
+            "paths_affected": stats["path_count"],
+            "highest_path_risk": stats["max_path_risk"],
+            "priority_score": stats["weighted_score"],
+            "reason": (
+                f"This connection appears in {stats['path_count']} "
+                f"remaining qualifying path(s), including a path "
+                f"scored {stats['max_path_risk']}/100. Review whether "
+                "the access is required and restrict it if appropriate."
+            ),
+        })
+
+    return recommendations
+
+
+
 def analyze_graph_snapshot(nodes, edges, max_depth=MAX_PATH_DEPTH, max_paths=MAX_PATHS):
     """Analyze directed paths on an in-memory graph snapshot without database writes."""
     node_map = {node["id"]: node for node in nodes}
@@ -594,6 +692,9 @@ def simulate_remediation(request: RemediationSimulationInput):
             "highest_risk_before": before_max,
             "highest_risk_after": after_max,
             "risk_score_reduction": before_max - after_max,
+            "recommendations": build_remediation_recommendations(
+                after["paths"], simulated_nodes
+            ),
             "scoring_note": (
                 f"{SCORING_NOTE} Path enumeration is limited to depth "
                 f"{MAX_PATH_DEPTH} and {MAX_PATHS} paths per analysis."

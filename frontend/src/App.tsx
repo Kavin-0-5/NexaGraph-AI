@@ -976,55 +976,77 @@ function App() {
                 </p>
               )}
 
-              {attackData.paths.length === 0 ? (
-                <div className="empty">
-                  No qualifying paths were found. Check that an exposed or
-                  compromised asset has a directed route to an asset marked
-                  Critical.
-                </div>
-              ) : (
-                <div className="attack-path-list">
-                  {attackData.paths.map((item, index) => (
-                    <button
-                      type="button"
-                      key={`${item.path.map((node) => node.id).join("-")}-${index}`}
-                      className={`attack-path-card ${
-                        selectedPathIndex === index ? "path-selected" : ""
-                      }`}
-                      aria-pressed={selectedPathIndex === index}
-                      onClick={() => highlightAttackPath(item, index)}
-                    >
-                      <div className="attack-path-heading">
-                        <strong>Path {index + 1}</strong>
-                        <span
-                          className={`risk-pill risk-${item.risk_level.toLowerCase()}`}
-                        >
-                          {item.risk_level} Risk
-                        </span>
-                      </div>
+              
+{attackData.paths.length === 0 ? (
+  <div className="empty">
+    No qualifying paths were found. Check that an exposed or
+    compromised asset has a directed route to an asset marked Critical.
+  </div>
+) : (
+  <div className="attack-path-list">
+    {attackData.paths.map((item, index) => (
+      <button
+        type="button"
+        key={`${item.path.map((node) => node.id).join("-")}-${index}`}
+        className={`attack-path-card ${
+          selectedPathIndex === index ? "path-selected" : ""
+        }`}
+        aria-pressed={selectedPathIndex === index}
+        onClick={() => highlightAttackPath(item, index)}
+      >
+        <div className="attack-path-heading">
+          <strong>Attack Path {index + 1}</strong>
+          <span
+            className={`risk-pill risk-${item.risk_level.toLowerCase()}`}
+          >
+            {item.risk_level} Risk
+          </span>
+        </div>
 
-                      <div className="risk-score">
-                        Risk score: {item.risk_score}/100
-                      </div>
+        <div className="attack-path-metadata">
+          <span>
+            <strong>{item.risk_score}</strong>/100 risk score
+          </span>
+          <span>{item.path.length} assets</span>
+          <span>{Math.max(0, item.path.length - 1)} hops</span>
+        </div>
 
-                      <div className="path-sequence">
-                        {item.path.map((node, nodeIndex) => (
-                          <span className="path-node" key={`${node.id}-${nodeIndex}`}>
-                            {node.name}
-                            {nodeIndex < item.path.length - 1 && (
-                              <span className="path-arrow"> → </span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
+        <div
+          className="risk-score-track"
+          aria-label={`Risk score ${item.risk_score} out of 100`}
+        >
+          <div
+            className={`risk-score-fill risk-fill-${item.risk_level.toLowerCase()}`}
+            style={{
+              width: `${Math.max(0, Math.min(100, item.risk_score))}%`,
+            }}
+          />
+        </div>
 
-                      <span className="path-hint">
-                        Select to highlight this route in the graph
-                      </span>
-                    </button>
-                  ))}
-                </div>
+        <div className="path-sequence">
+          {item.path.map((node, nodeIndex) => (
+            <span
+              className="path-node"
+              key={`${node.id}-${nodeIndex}`}
+            >
+              {node.name}
+              {nodeIndex < item.path.length - 1 && (
+                <span className="path-arrow"> → </span>
               )}
+            </span>
+          ))}
+        </div>
+
+        <span className="path-hint">
+          {selectedPathIndex === index
+            ? "Currently highlighted in the graph"
+            : "Select to highlight this route in the graph"}
+        </span>
+      </button>
+    ))}
+  </div>
+)}
+
 
               <p className="attack-note">{attackData.scoring_note}</p>
             </div>
@@ -1128,29 +1150,86 @@ function App() {
                 </span>
               </div>
 
-              <div className="simulation-metrics">
-                <div className="stat-card">
-                  <span>Paths Before</span>
-                  <strong>{simulationResult.before.total_paths}</strong>
-                </div>
-                <div className="stat-card">
-                  <span>Paths After</span>
-                  <strong>{simulationResult.after.total_paths}</strong>
-                </div>
-                <div className="stat-card">
-                  <span>Paths Eliminated</span>
-                  <strong>{simulationResult.paths_eliminated}</strong>
-                </div>
-                <div className="stat-card">
-                  <span>Highest Risk After</span>
-                  <strong>{simulationResult.highest_risk_after}/100</strong>
-                </div>
-              </div>
+              
+<div className="simulation-metrics">
+  <div className="stat-card">
+    <span>Paths Before</span>
+    <strong>{simulationResult.before.total_paths}</strong>
+  </div>
+
+  <div className="stat-card">
+    <span>Paths After</span>
+    <strong>{simulationResult.after.total_paths}</strong>
+  </div>
+
+  <div className="stat-card">
+    <span>Paths Eliminated</span>
+    <strong>{simulationResult.paths_eliminated}</strong>
+  </div>
+
+  <div className="stat-card">
+    <span>Path Reduction</span>
+    <strong>
+      {simulationResult.before.total_paths > 0
+        ? `${Math.round(
+            (simulationResult.paths_eliminated /
+              simulationResult.before.total_paths) * 100
+          )}%`
+        : "N/A"}
+    </strong>
+  </div>
+
+  <div className="stat-card">
+    <span>Highest Risk After</span>
+    <strong>{simulationResult.highest_risk_after}/100</strong>
+  </div>
+</div>
+
 
               <p className="attack-note">
                 Highest risk before: {simulationResult.highest_risk_before}/100 ·
                 Score reduction: {simulationResult.risk_score_reduction} points
               </p>
+              
+<div
+  className={`simulation-risk-status ${
+    simulationResult.after.paths.length === 0
+      ? "status-no-paths"
+      : simulationResult.highest_risk_after >= 80
+        ? "status-critical"
+        : simulationResult.highest_risk_after >= 60
+          ? "status-high"
+          : simulationResult.highest_risk_after >= 35
+            ? "status-medium"
+            : "status-low"
+  }`}
+  role="status"
+>
+  <strong>
+    {simulationResult.after.paths.length === 0
+      ? "No qualifying attack paths remain"
+      : simulationResult.highest_risk_after >= 80
+        ? "Critical risk remains"
+        : simulationResult.highest_risk_after >= 60
+          ? "High risk remains"
+          : simulationResult.highest_risk_after >= 35
+            ? "Moderate risk remains"
+            : "Lower residual risk"}
+  </strong>
+
+  <p>
+    {simulationResult.after.paths.length === 0
+      ? "No qualifying paths were found within the current analysis limits. This does not prove the environment is secure."
+      : `${simulationResult.paths_eliminated} of ${simulationResult.before.total_paths} qualifying paths eliminated. ${
+          simulationResult.highest_risk_after === simulationResult.highest_risk_before
+            ? "The highest risk score has not decreased."
+            : simulationResult.risk_score_reduction > 0
+              ? `The highest risk score decreased by ${simulationResult.risk_score_reduction} points.`
+              : "The highest risk score increased; investigate the remaining routes."
+        }`}
+  </p>
+</div>
+
 
               <h4>Remaining Attack Paths</h4>
               {simulationResult.after.paths.length === 0 ? (
@@ -1180,6 +1259,130 @@ function App() {
               <p className="attack-note">
                 {simulationResult.scoring_note || "Risk scores are prototype heuristics, not probabilities of a real attack."}
               </p>
+              
+
+<div className="remediation-recommendations">
+  <h4>Recommended Next Actions</h4>
+
+  {simulationResult.after.paths.length === 0 ? (
+    <div className="recommendation-item">
+      <strong>All identified paths eliminated in this simulation</strong>
+      <p>
+        No qualifying attack paths remain in the simulated graph.
+        Validate the affected assets and connections in your live
+        environment before implementing any changes.
+      </p>
+      <p>
+        Paths eliminated: {simulationResult.paths_eliminated}
+      </p>
+    </div>
+  ) : (
+    <>
+      {(() => {
+        const highestRiskPath = simulationResult.after.paths.reduce(
+          (highest, current) =>
+            current.risk_score > highest.risk_score ? current : highest
+        );
+
+        const pathAssets = highestRiskPath.path;
+        const firstAsset = pathAssets[0];
+        const lastAsset = pathAssets[pathAssets.length - 1];
+
+        return (
+          <>
+            <div className="recommendation-item">
+              <strong>
+                1. Prioritize the highest-risk remaining route
+              </strong>
+
+              <div className="recommendation-risk-summary">
+                <span>
+                  Risk score:{" "}
+                  <strong>{highestRiskPath.risk_score}/100</strong>
+                </span>
+                <span>
+                  Risk level:{" "}
+                  <strong>{highestRiskPath.risk_level}</strong>
+                </span>
+                <span>
+                  Assets involved: <strong>{pathAssets.length}</strong>
+                </span>
+              </div>
+
+              <p>
+                Review the directed route from{" "}
+                <strong>{firstAsset.name}</strong> to{" "}
+                <strong>{lastAsset.name}</strong>. Investigate the
+                assets and connections along this route to identify
+                where additional controls may reduce exposure.
+              </p>
+
+              <div className="recommendation-asset-list">
+                {pathAssets.map((asset, index) => (
+                  <div
+                    className="recommendation-asset"
+                    key={`${asset.id}-${index}`}
+                  >
+                    <span className="recommendation-asset-number">
+                      {index + 1}
+                    </span>
+                    <span>{asset.name}</span>
+                    {index < pathAssets.length - 1 && (
+                      <span className="recommendation-asset-arrow">
+                        →
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="simulation-path-button"
+                onClick={() =>
+                  highlightAttackPath(highestRiskPath, 0)
+                }
+              >
+                Highlight this attack path
+              </button>
+            </div>
+          </>
+        );
+      })()}
+
+      <div className="recommendation-item">
+        <strong>2. Review the residual risk</strong>
+        <p>
+          {simulationResult.highest_risk_after >= 80
+            ? "Critical risk remains. Prioritize investigation of the highest-risk route and its reachable critical assets."
+            : simulationResult.highest_risk_after >= 60
+              ? "High risk remains. Review the assets and connections that preserve the remaining attack routes."
+              : simulationResult.highest_risk_after >= 35
+                ? "Moderate risk remains. Review the remaining routes for additional exposure-reduction opportunities."
+                : "The remaining paths have lower scores under the current heuristic. Validate the results and continue monitoring."}
+        </p>
+      </div>
+
+      <div className="recommendation-item">
+        <strong>3. Verify the simulated change</strong>
+        <p>
+          {simulationResult.paths_eliminated > 0
+            ? `${simulationResult.paths_eliminated} qualifying attack path(s) were eliminated in this simulation. Confirm that the proposed change addresses the intended exposure before applying it.`
+            : "No qualifying attack paths were eliminated. Consider evaluating a different asset or connection."}
+        </p>
+        <p>
+          Database modified:{" "}
+          <strong>
+            {simulationResult.database_modified ? "Yes" : "No"}
+          </strong>
+        </p>
+      </div>
+    </>
+  )}
+</div>
+
+
+
             </div>
           )}
         </section>

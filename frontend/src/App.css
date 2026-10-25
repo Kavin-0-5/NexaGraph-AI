@@ -809,3 +809,248 @@ edge.path-highlight {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.remediation-recommendations {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.remediation-recommendations h4 {
+  margin: 0 0 16px;
+}
+
+.recommendation-item {
+  margin-top: 12px;
+  padding: 14px;
+  border-left: 3px solid #d4a84f;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.07);
+}
+
+.recommendation-item strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.recommendation-item p {
+  margin: 0;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.recommendation-item .simulation-path-button {
+  margin-top: 12px;
+}
+
+.simulation-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.simulation-metrics .stat-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.35);
+}
+
+.simulation-metrics .stat-card span {
+  display: block;
+  margin-bottom: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.simulation-metrics .stat-card strong {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .simulation-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .simulation-metrics .stat-card {
+    padding: 12px;
+  }
+
+  .simulation-metrics .stat-card strong {
+    font-size: 21px;
+  }
+}
+
+.attack-path-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 12px 0;
+  color: #a8b8d0;
+  font-size: 13px;
+}
+
+.attack-path-metadata strong {
+  color: #f8fafc;
+  font-size: 16px;
+}
+
+.risk-score-track {
+  width: 100%;
+  height: 6px;
+  margin: 10px 0 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #263247;
+}
+
+.risk-score-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.risk-fill-low {
+  background: #22c55e;
+}
+
+.risk-fill-medium {
+  background: #eab308;
+}
+
+.risk-fill-high {
+  background: #f97316;
+}
+
+.risk-fill-critical {
+  background: #ef4444;
+}
+
+.attack-path-card {
+  width: 100%;
+  text-align: left;
+}
+
+.attack-path-card.path-selected {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35);
+}
+
+.attack-path-card .path-hint {
+  display: block;
+  margin-top: 12px;
+  color: #93a4bd;
+  font-size: 12px;
+}
+
+.attack-path-card .path-sequence {
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+
+.recommendation-risk-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 14px 0;
+  color: #a8b8d0;
+  font-size: 13px;
+}
+
+.recommendation-risk-summary strong {
+  color: #f8fafc;
+}
+
+.recommendation-asset-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.recommendation-asset {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.recommendation-asset-number {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #1d4ed8;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.recommendation-asset-arrow {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.recommendation-item .simulation-path-button {
+  margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  .recommendation-risk-summary {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.simulation-risk-status {
+  margin: 16px 0 22px;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-left: 4px solid #64748b;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.35);
+}
+
+.simulation-risk-status strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.simulation-risk-status p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.simulation-risk-status.status-critical {
+  border-left-color: #ef4444;
+}
+
+.simulation-risk-status.status-high {
+  border-left-color: #f97316;
+}
+
+.simulation-risk-status.status-medium {
+  border-left-color: #eab308;
+}
+
+.simulation-risk-status.status-low,
+.simulation-risk-status.status-no-paths {
+  border-left-color: #22c55e;
+}
+
