@@ -352,196 +352,64 @@ def delete_connection(connection: DeleteConnectionInput):
             detail="Failed to delete connection."
         ) from exc
 
-@app.get("/attack-paths")
-def get_attack_paths():
-    """
-    Find directed paths from exposed or compromised assets
-    to critical assets. Uses a simple prototype risk heuristic.
-    """
-    try:
-        data = graph_data()
-        nodes = data["nodes"]
-        edges = data["edges"]
-
-        node_map = {node["id"]: node for node in nodes}
-        adjacency = {node["id"]: [] for node in nodes}
-
-        for edge in edges:
-            source = edge["source"]
-            target = edge["target"]
-
-            if source in adjacency and target in node_map:
-                adjacency[source].append(edge)
-
-        sources = [
-            node for node in nodes
-            if node.get("exposed") == "Yes"
-            or node.get("compromised") == "Yes"
-        ]
-
-        targets = {
-            node["id"] for node in nodes
-            if str(node.get("criticality", "")).lower() == "critical"
-        }
-
-        paths = []
-        max_depth = 8
-        max_paths = 100
-
-        def explore(current_id, path_ids, path_edges):
-            if len(paths) >= max_paths:
-                return
-
-            if current_id in targets and len(path_ids) > 1:
-                path_nodes = [node_map[node_id] for node_id in path_ids]
-
-                score = 0
-
-                # Starting-point risk
-                if path_nodes[0].get("exposed") == "Yes":
-                    score += 30
-                if path_nodes[0].get("compromised") == "Yes":
-                    score += 40
-
-                # Critical destination
-                score += 30
-
-                # Risk from intermediate assets
-                for node in path_nodes[1:-1]:
-                    level = str(node.get("criticality", "")).lower()
-                    score += {
-                        "low": 2,
-                        "medium": 5,
-                        "high": 10,
-                        "critical": 15,
-                    }.get(level, 0)
-
-                    if node.get("compromised") == "Yes":
-                        score += 10
-
-                score = min(score, 100)
-
-                paths.append({
-                    "path": path_nodes,
-                    "connections": path_edges,
-                    "risk_score": score,
-                    "risk_level": (
-                        "Critical" if score >= 80
-                        else "High" if score >= 60
-                        else "Medium" if score >= 35
-                        else "Low"
-                    ),
-                })
-                return
-
-            if len(path_ids) >= max_depth:
-                return
-
-            for edge in adjacency.get(current_id, []):
-                next_id = edge["target"]
-
-                # Prevent cycles within a path.
-                if next_id in path_ids:
-                    continue
-
-                explore(
-                    next_id,
-                    path_ids + [next_id],
-                    path_edges + [edge],
-                )
-
-        for source in sources:
-            explore(source["id"], [source["id"]], [])
-
-            if len(paths) >= max_paths:
-                break
-
-        paths.sort(key=lambda item: item["risk_score"], reverse=True)
-
-        return {
-            "paths": paths,
-            "total_paths": len(paths),
-            "max_paths_reached": len(paths) >= max_paths,
-            "scoring_note": (
-                "Prototype heuristic based on exposure, compromise, "
-                "asset criticality, and path structure. Not a probability "
-                "of a real attack."
-            ),
-        }
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="Could not analyze attack paths."
-        ) from exc
-
-class RemediationSimulationInput(BaseModel):
-    action_type: str = Field(
-        description="isolate-asset or remove-connection"
-    )
-    target_id: str | None = None
-    source_id: str | None = None
-    destination_id: str | None = None
-    relationship: str | None = None
+# Shared path analysis and scoring are used by both regular analysis and
+# remediation simulation, so before/after scores stay consistent.
+MAX_PATH_DEPTH = 8
+MAX_PATHS = 100
+SCORING_NOTE = (
+    "Prototype heuristic based on exposure, compromise, asset criticality, "
+    "and path structure. Not a probability of a real attack."
+)
 
 
-def analyze_graph_snapshot(nodes, edges, max_depth=8, max_paths=100):
-    """Analyze a graph snapshot without writing to Neo4j."""
+def analyze_graph_snapshot(nodes, edges, max_depth=MAX_PATH_DEPTH, max_paths=MAX_PATHS):
+    """Analyze directed paths on an in-memory graph snapshot without database writes."""
     node_map = {node["id"]: node for node in nodes}
     adjacency = {node["id"]: [] for node in nodes}
 
     for edge in edges:
         source = edge.get("source")
         target = edge.get("target")
-
         if source in adjacency and target in node_map:
             adjacency[source].append(edge)
 
     sources = [
         node for node in nodes
-        if node.get("exposed") == "Yes"
-        or node.get("compromised") == "Yes"
+        if node.get("exposed") == "Yes" or node.get("compromised") == "Yes"
     ]
-
     targets = {
         node["id"] for node in nodes
         if str(node.get("criticality", "")).lower() == "critical"
     }
 
     paths = []
+    limit_reached = False
 
     def calculate_score(path_nodes):
         score = 0
-
         if path_nodes[0].get("exposed") == "Yes":
             score += 30
         if path_nodes[0].get("compromised") == "Yes":
             score += 40
 
+        # Preserve the scoring formula used by the original /attack-paths route.
         score += 30
-
         for node in path_nodes[1:-1]:
             level = str(node.get("criticality", "")).lower()
-            score += {
-                "low": 2,
-                "medium": 5,
-                "high": 10,
-                "critical": 15,
-            }.get(level, 0)
-
+            score += {"low": 2, "medium": 5, "high": 10, "critical": 15}.get(level, 0)
             if node.get("compromised") == "Yes":
                 score += 10
-
         return min(score, 100)
 
     def explore(current_id, path_ids, path_edges):
+        nonlocal limit_reached
         if len(paths) >= max_paths:
+            limit_reached = True
             return
 
         if current_id in targets and len(path_ids) > 1:
             path_nodes = [node_map[node_id] for node_id in path_ids]
             score = calculate_score(path_nodes)
-
             paths.append({
                 "path": path_nodes,
                 "connections": path_edges,
@@ -559,29 +427,48 @@ def analyze_graph_snapshot(nodes, edges, max_depth=8, max_paths=100):
 
         for edge in adjacency.get(current_id, []):
             next_id = edge["target"]
-
-            if next_id not in path_ids:
-                explore(
-                    next_id,
-                    path_ids + [next_id],
-                    path_edges + [edge],
-                )
-
-                if len(paths) >= max_paths:
-                    return
+            if next_id in path_ids:
+                continue
+            explore(next_id, path_ids + [next_id], path_edges + [edge])
+            if len(paths) >= max_paths:
+                limit_reached = True
+                return
 
     for source in sources:
         explore(source["id"], [source["id"]], [])
         if len(paths) >= max_paths:
+            limit_reached = True
             break
 
     paths.sort(key=lambda item: item["risk_score"], reverse=True)
-
     return {
         "paths": paths,
         "total_paths": len(paths),
-        "max_paths_reached": len(paths) >= max_paths,
+        "max_paths_reached": limit_reached,
+        "scoring_note": SCORING_NOTE,
     }
+
+
+@app.get("/attack-paths")
+def get_attack_paths():
+    """Find directed paths from exposed/compromised assets to critical assets."""
+    try:
+        data = graph_data()
+        return analyze_graph_snapshot(data["nodes"], data["edges"])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not analyze attack paths.",
+        ) from exc
+
+class RemediationSimulationInput(BaseModel):
+    action_type: str = Field(
+        description="isolate-asset or remove-connection"
+    )
+    target_id: str | None = None
+    source_id: str | None = None
+    destination_id: str | None = None
+    relationship: str | None = None
 
 
 @app.post("/simulate-remediation")
@@ -708,9 +595,8 @@ def simulate_remediation(request: RemediationSimulationInput):
             "highest_risk_after": after_max,
             "risk_score_reduction": before_max - after_max,
             "scoring_note": (
-                "Scores are prototype heuristics, not probabilities "
-                "of a real attack. Path enumeration is limited to "
-                "depth 8 and 100 paths."
+                f"{SCORING_NOTE} Path enumeration is limited to depth "
+                f"{MAX_PATH_DEPTH} and {MAX_PATHS} paths per analysis."
             ),
         }
 
