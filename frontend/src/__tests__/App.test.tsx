@@ -1,5 +1,5 @@
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
@@ -13,14 +13,44 @@ const mockCy = {
   addClass: vi.fn().mockReturnThis(),
 })),
   nodes: vi.fn(() => ({
-  filter: vi.fn(() => ({
-    length: 1,
-    removeClass: vi.fn().mockReturnThis(),
-    addClass: vi.fn().mockReturnThis(),
-    connectedEdges: vi.fn(() => ({
+  filter: vi.fn((callback: (node: any) => boolean) => {
+    const assets = [
+      {
+        id: "A01",
+        label: "Internet",
+        type: "External",
+        ip: "0.0.0.0",
+      },
+      {
+        id: "A06",
+        label: "Customer-DB",
+        type: "Database",
+        ip: "10.0.0.6",
+      },
+    ];
+
+    const matchingAssets = assets.filter((asset) => {
+  const node = {
+    data: (key: string) => asset[key as keyof typeof asset],
+  };
+
+  const result = callback(node);
+
+  console.log("Asset data:", asset);
+  console.log("Search match:", result);
+
+  return result;
+});
+
+    return {
+      length: matchingAssets.length,
       removeClass: vi.fn().mockReturnThis(),
-    })),
-  })),
+      addClass: vi.fn().mockReturnThis(),
+      connectedEdges: vi.fn(() => ({
+        removeClass: vi.fn().mockReturnThis(),
+      })),
+    };
+  }),
 })),
   edges: vi.fn(() => ({
     filter: vi.fn(() => ({
@@ -2883,6 +2913,66 @@ it("searches graph assets and highlights matching nodes", async () => {
   });
 
   expect(searchInput).toHaveValue("Internet");
+});
+
+it("clears graph search and resets search highlighting", async () => {
+  const user = userEvent.setup();
+
+  render(<App />);
+
+  await screen.findByText("SYSTEM ONLINE");
+
+  const searchInput = screen.getByRole("searchbox", {
+    name: "Search graph assets",
+  });
+
+  // Search for an asset
+  await user.type(searchInput, "Internet");
+
+  await waitFor(() => {
+    expect(mockCy.animate).toHaveBeenCalled();
+  });
+
+  expect(searchInput).toHaveValue("Internet");
+
+  // Record the number of graph cleanup calls
+  const callsBeforeClear = mockCy.elements.mock.calls.length;
+
+  // Clear the search
+  await user.clear(searchInput);
+
+  await waitFor(() => {
+    expect(searchInput).toHaveValue("");
+    expect(mockCy.elements).toHaveBeenCalledTimes(
+      callsBeforeClear + 1
+    );
+  });
+});
+
+it("does not animate the graph when no assets match the search", async () => {
+  const user = userEvent.setup();
+
+  render(<App />);
+
+  await screen.findByText("SYSTEM ONLINE");
+
+  const searchInput = screen.getByRole("searchbox", {
+    name: "Search graph assets",
+  });
+
+ mockCy.animate.mockClear();
+
+fireEvent.change(searchInput, {
+  target: { value: "NonexistentAsset" },
+});
+
+  await waitFor(() => {
+    expect(searchInput).toHaveValue("NonexistentAsset");
+  });
+
+  expect(mockCy.nodes).toHaveBeenCalled();
+  
+  expect(mockCy.animate).not.toHaveBeenCalled();
 });
 
 });
