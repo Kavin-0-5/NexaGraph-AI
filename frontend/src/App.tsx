@@ -712,7 +712,7 @@ function App() {
 
   const compromisedCount =
     graph?.nodes.filter(
-      (node) => node.compromised.toLowerCase() === "yes"
+      (node) => String(node.compromised).toLowerCase() === "yes"
     ).length ?? 0;
 
   const selectedConnections =
